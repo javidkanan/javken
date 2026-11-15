@@ -2,16 +2,22 @@ import { assets, inlineScript, inlineStyle } from "./assets.mjs";
 
 const sizes = new Set(["XS", "S", "M", "L", "XL", "XXL", "undecided"]);
 const compactSizes = new Set(["S", "M", "L", "XL"]);
+const databaseErrorCodes = new Set([
+  "42501", "42P01", "42P10", "42703", "23502", "23503", "23505", "23514", "22P02",
+  "PGRST000", "PGRST001", "PGRST002", "PGRST003", "PGRST106", "PGRST116",
+  "PGRST125", "PGRST204", "PGRST205", "PGRST301", "PGRST302", "PGRST303",
+]);
 const securityHeaders = {
   "Content-Security-Policy": `default-src 'self'; img-src 'self' data:; style-src 'self' https://fonts.googleapis.com '${inlineStyle}'; font-src https://fonts.gstatic.com; script-src 'self' '${inlineScript}'; form-action 'self'; frame-ancestors 'self'; base-uri 'none'; object-src 'none'`,
   "Referrer-Policy": "same-origin",
   "X-Content-Type-Options": "nosniff",
 };
 
-function result(request, status, message, field) {
+function result(request, status, message, field, reference) {
   const ok = status >= 200 && status < 300;
   const headers = { ...securityHeaders, "Cache-Control": "no-store" };
   if (status === 405) headers.Allow = "POST";
+  if (reference) headers["X-LOF-Request-ID"] = reference;
   if (request.headers.get("Accept")?.includes("application/json")) {
     return Response.json({ ok, message, ...(field && { field }) }, { status, headers });
   }
@@ -51,6 +57,70 @@ function normalizeContact(value) {
   return null;
 }
 
+function isLegacyServiceRole(key) {
+  if (!/^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(key)) return false;
+  try {
+    const payload = key.split(".")[1].replaceAll("-", "+").replaceAll("_", "/");
+    return JSON.parse(atob(payload)).role === "service_role";
+  } catch {
+    return false;
+  }
+}
+
+async function saveRegistration(env, registration) {
+  const projectUrl = typeof env?.SUPABASE_URL === "string" ? env.SUPABASE_URL.trim() : "";
+  const key = typeof env?.SUPABASE_SECRET_KEY === "string" ? env.SUPABASE_SECRET_KEY.trim() : "";
+  const missing = [];
+  if (env?.SUPABASE_URL == null || env.SUPABASE_URL === "") missing.push("SUPABASE_URL");
+  if (env?.SUPABASE_SECRET_KEY == null || env.SUPABASE_SECRET_KEY === "") missing.push("SUPABASE_SECRET_KEY");
+  if (missing.length) return { stage: "missing_binding", missing };
+
+  let endpoint;
+  try {
+    const project = new URL(projectUrl);
+    if (project.protocol !== "https:" || project.username || project.password ||
+        project.pathname !== "/" || project.search || project.hash ||
+        ["supabase.com", "www.supabase.com", "app.supabase.com"].includes(project.hostname)) {
+      return { stage: "invalid_project_url" };
+    }
+    endpoint = new URL("/rest/v1/waitlist", project);
+    endpoint.searchParams.set("on_conflict", "contact");
+  } catch {
+    return { stage: "invalid_project_url" };
+  }
+
+  const headers = {
+    apikey: key,
+    "Content-Type": "application/json",
+    Prefer: "resolution=ignore-duplicates,return=minimal",
+  };
+  if (!/^sb_secret_[\w-]+$/.test(key)) {
+    if (!isLegacyServiceRole(key)) return { stage: "invalid_key_type" };
+    headers.Authorization = `Bearer ${key}`;
+  }
+
+  const signal = AbortSignal.timeout(8000);
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      redirect: "manual",
+      headers,
+      body: JSON.stringify(registration),
+      signal,
+    });
+  } catch {
+    return { stage: signal.aborted ? "upstream_timeout" : "upstream_network_error" };
+  }
+  if (response.ok) return null;
+  const status = response.status;
+  if (status >= 300 && status < 400) return { stage: "upstream_redirect", status };
+
+  const data = await response.json().catch(() => null);
+  const code = databaseErrorCodes.has(data?.code) ? data.code : undefined;
+  return { stage: "upstream_rejected", status, ...(code && { code }) };
+}
+
 async function submit(request, env, url) {
   if (request.method !== "POST") return result(request, 405, "Bu ünvan qeydiyyat göndərmək üçündür.");
   const origin = request.headers.get("Origin");
@@ -87,32 +157,18 @@ async function submit(request, env, url) {
   }
   if (!compact && data.get("consent") !== "yes") return result(request, 422, "Davam etmək üçün razılıq xanasını işarələ.", "consent");
 
-  try {
-    if (!env.SUPABASE_URL || !env.SUPABASE_SECRET_KEY) throw new Error("Supabase is not configured");
-    const endpoint = new URL("/rest/v1/waitlist", env.SUPABASE_URL);
-    if (endpoint.protocol !== "https:") throw new Error("Supabase requires HTTPS");
-    endpoint.searchParams.set("on_conflict", "contact");
-    // Keep repeat requests idempotent without revealing who is on the list.
-    const saved = await fetch(endpoint, {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        apikey: env.SUPABASE_SECRET_KEY,
-        "Content-Type": "application/json",
-        Prefer: "resolution=ignore-duplicates,return=minimal",
-      },
-      body: JSON.stringify({
-        size,
-        city: city || "Qeyd edilməyib",
-        contact_type: contact.type,
-        contact: contact.value,
-        consent_version: compact ? "drop-001-v2" : "drop-001-v1",
-      }),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!saved.ok) throw new Error("Supabase write did not succeed");
-  } catch {
-    return result(request, 503, "Qeydiyyatı saxlamaq mümkün olmadı. Bir az sonra yenidən cəhd et.");
+  const failure = await saveRegistration(env, {
+    size,
+    city: city || "Qeyd edilməyib",
+    contact_type: contact.type,
+    contact: contact.value,
+    consent_version: compact ? "drop-001-v2" : "drop-001-v1",
+  });
+  if (failure) {
+    const reference = crypto.randomUUID();
+    // Log only controlled diagnostics. Never log the request, key or upstream body.
+    console.error(JSON.stringify({ event: "waitlist_save_failed", reference, ...failure }));
+    return result(request, 503, "Qeydiyyatı saxlamaq mümkün olmadı. Bir az sonra yenidən cəhd et.", undefined, reference);
   }
   const contactMethod = contact.type === "email" ? "e-poçt" : "WhatsApp";
   return result(request, 200, `LAND OF FIRE komandası tezliklə sizinlə ${contactMethod} vasitəsilə əlaqə saxlayacaq. Hələlik ödəniş etməyinizə ehtiyac yoxdur.`);

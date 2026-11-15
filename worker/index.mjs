@@ -57,6 +57,14 @@ function normalizeContact(value) {
   return null;
 }
 
+function normalizeName(value) {
+  return (value ?? "").normalize("NFC").trim().replace(/\s+/g, " ");
+}
+
+function validName(value) {
+  return value.length <= 80 && /^\p{L}[\p{L}\p{M} .’'\-]*$/u.test(value);
+}
+
 function isLegacyServiceRole(key) {
   if (!/^eyJ[\w-]+\.[\w-]+\.[\w-]+$/.test(key)) return false;
   try {
@@ -138,10 +146,19 @@ async function submit(request, env, url) {
   if (data.get("website")) return result(request, 400, "Qeydiyyatı göndərmək mümkün olmadı.");
 
   const size = data.get("size");
+  const firstName = normalizeName(data.get("first_name"));
+  const lastName = normalizeName(data.get("last_name"));
+  const instagramInput = data.get("instagram")?.trim() ?? "";
+  const instagram = instagramInput.replace(/^@/, "");
   const city = data.get("city")?.normalize("NFC").trim().replace(/\s+/g, " ") ?? "";
   const contact = normalizeContact(data.get("contact")?.trim() ?? "");
   const channel = data.get("contact_channel");
   const compact = data.get("consent") === "notice-v2";
+  if (!firstName) return result(request, 422, "Adını yaz.", "first_name");
+  if (!validName(firstName)) return result(request, 422, "Adını hərflərlə yaz (ən çox 80 simvol).", "first_name");
+  if (lastName && !validName(lastName)) {
+    return result(request, 422, "Soyadını hərflərlə yaz (ən çox 80 simvol).", "last_name");
+  }
   if (!(compact ? compactSizes : sizes).has(size)) return result(request, 422, "Siyahıdan ölçünü seç.", "size");
   if ((!compact || city) && (city.length < 2 || city.length > 80 || !/^[\p{L}\p{M}][\p{L}\p{M}\p{N} .’'()-]*$/u.test(city))) {
     return result(request, 422, "Şəhər və ya rayonun adını yaz.", "city");
@@ -155,9 +172,15 @@ async function submit(request, env, url) {
   if (!contact || (channel !== null && channel !== "email" && channel !== "whatsapp")) {
     return result(request, 422, "Düzgün e-poçt ünvanı və ya ölkə kodlu telefon nömrəsi yaz.", "contact");
   }
+  if (instagramInput && !/^[a-z0-9._]{1,30}$/i.test(instagram)) {
+    return result(request, 422, "Instagram istifadəçi adını yaz. Məsələn, @istifadeci_adi.", "instagram");
+  }
   if (!compact && data.get("consent") !== "yes") return result(request, 422, "Davam etmək üçün razılıq xanasını işarələ.", "consent");
 
   const failure = await saveRegistration(env, {
+    first_name: firstName,
+    last_name: lastName || null,
+    instagram: instagram.toLowerCase() || null,
     size,
     city: city || "Qeyd edilməyib",
     contact_type: contact.type,

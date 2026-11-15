@@ -1,39 +1,27 @@
-# LAND OF FIRE · GitHub + Supabase
+# LAND OF FIRE · javken
 
-GitHub kodu saxlayır, Cloudflare Workers saytı yayımlayır, Supabase qeydiyyatları saxlayır.
+[Mövcud GitHub repozitoriyası](https://github.com/javidkanan/javken) · [Canlı sayt](https://javken.landoffire.workers.dev/)
 
-## 1. Supabase
+## Forma yeniləməsini yayımla
 
-1. [Supabase Dashboard](https://supabase.com/dashboard) → **New project**. Layihənin adını `land-of-fire` yaz.
-2. Layihədə **SQL Editor → New query** aç. `supabase/setup.sql` faylının bütün mətnini ora yapışdır və **Run** bas. `waitlist` cədvəli **Table Editor** bölməsində görünəcək.
-3. **Connect** bölməsindən **Project URL** dəyərini götür. Məsələn, `https://abcxyz.supabase.co`.
-4. **Settings → API Keys → Secret keys** bölməsində bu sayt üçün yeni açar yarat və `sb_secret_…` dəyərini götür. Onu yalnız Cloudflare Worker-in **Variables and Secrets** bölməsində saxla.
+1. [Supabase Dashboard](https://supabase.com/dashboard) → **javken → SQL Editor → New query** aç. ZIP-dəki `supabase/add_customer_details.sql` faylının mətnini ora yapışdır və **Run** bas. Skript mövcud `waitlist` cədvəlinə üç sütun əlavə edir, əvvəlki sifarişləri və RLS icazələrini qoruyur. Bu addımı GitHub commit-indən əvvəl et.
 
-## 2. GitHub
+2. GitHub-dakı mövcud `javken` repozitoriyasında bu faylları eyni yollarda yenilə və `main` budağına commit et.
 
-1. [GitHub-da yeni repozitoriya yarat](https://github.com/new), adını `land-of-fire-drop-001` yaz və ilkin README ilə yarat.
-2. Repozitoriyanın **Code** səhifəsində **Add file → Upload files** seç. Paketdən çıxardığın qovluğun **içindəki fayl və qovluqları** yüklə. `wrangler.jsonc`, `package.json`, `source`, `worker`, `scripts` və `supabase` repozitoriyanın əsas səviyyəsində olmalıdır.
-3. **Commit changes** bas. Kod hər kəsə görünməlidirsə GitHub-da **Public** seç. Saytın ziyarətçilərə açıq olması üçün repozitoriyanı ictimai etməyə ehtiyac yoxdur.
+   - `source/index.html`
+   - `source/styles.css`
+   - `source/app.js`
+   - `worker/index.mjs`
+   - `scripts/waitlist.test.mjs`
+   - `supabase/add_customer_details.sql`
+   - `README.md`
 
-## 3. Cloudflare
+3. [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages → javken → Deployments** bölməsində yeni commit-in yayımlandığını yoxla. Canlı formadan yeni sınaq göndər və **Supabase → Table Editor → waitlist** bölməsində `first_name`, `last_name`, `instagram` və `size` sütunlarına bax.
 
-1. [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages → Create application → GitHub**. GitHub hesabını bağla və `land-of-fire-drop-001` repozitoriyasını seç.
-2. Worker adı `land-of-fire-drop-001`, production branch `main`, root directory `/` olsun. **Build command** boş qala bilər. Layihə build əmrini öz konfiqurasiyasında saxlayır. **Deploy command** üçün `npx wrangler deploy` yaz və **Save and Deploy** bas.
-3. Worker-də **Settings → Variables and Secrets → Add** seç. Bu iki dəyəri əlavə et:
+Ad tələb olunur. Soyad və Instagram boş qala bilər. Instagram adı `@` işarəsi olmadan saxlanır. Təkrar göndəriş mövcud sətri yeniləmir, ona görə yeni sahələri əvvəllər qeydiyyatdan keçməmiş əlaqə ünvanı ilə yoxla. Sıfırdan quraşdırma zamanı əvvəl `supabase/setup.sql`, sonra `supabase/add_customer_details.sql` faylını işlə.
 
-   | Növ | Ad | Dəyər |
-   | --- | --- | --- |
-   | Text | `SUPABASE_URL` | Supabase Project URL |
-   | Secret | `SUPABASE_SECRET_KEY` | `sb_secret_…` |
+## Canlı göndəriş yenə alınmasa
 
-4. Dəyişiklikləri **Deploy** ilə tətbiq et. Worker-in `workers.dev` linkini aç.
+Cloudflare → **Workers & Pages → javken → Observability → Logs** bölməsində `waitlist_save_failed` hadisəsini axtar. Orada `PGRST204` görünürsə, bu yeniləmənin SQL faylının Cloudflare-də bağlı olan Supabase layihəsində işləndiyini yoxla. SQL faylı Data API-nin sxem keşini də yeniləyir. [PostgREST sxem keşi](https://docs.postgrest.org/en/stable/references/schema_cache.html)
 
-## 4. Formanı yoxla
-
-1. Bir e-poçt və bir WhatsApp sınaq qeydiyyatı göndər.
-2. Supabase **Table Editor → waitlist** bölməsində iki yeni sətri, ölçünü və əlaqə məlumatını yoxla.
-3. Qeydiyyat alınmırsa Cloudflare-də iki dəyişənin adını və dəyərlərini, Supabase-də isə `setup.sql` sorğusunun uğurla bitdiyini yoxla.
-
-Köhnə ChatGPT Sites linkində toplanan qeydlər D1-də saxlanılır. Onları köçürmək lazımdırsa, CSV-ni Supabase-ə məxfi şəkildə idxal et. Yeni sifarişlər üçün müştərilərə Worker linkini göndər.
-
-Yerli kod yoxlaması üçün Node.js 24 və ya daha yeni versiya ilə `npm test` işlət.
+Yerli yoxlama üçün Node.js 24 və ya daha yeni versiya ilə `npm test` işlət. Bu testlər Supabase cavablarını simulyasiya edir. Canlı bağlantını yuxarıdakı iki qeydiyyatla təsdiqlə.

@@ -99,8 +99,23 @@
       <div class="signup-inner reveal">
         <h2 id="waitlist-title">Siyahıya <span>qoşul.</span></h2>
         <form id="signup" action="/api/waitlist" method="post">
-          <fieldset id="sizes">
-            <legend>Ölçü</legend>
+          <div class="customer-name">
+            <div class="field">
+              <label for="first-name">Ad</label>
+              <input id="first-name" name="first_name" autocomplete="given-name" maxlength="80" aria-describedby="first-name-error" required>
+              <p id="first-name-error" class="form-error" aria-live="polite"></p>
+            </div>
+            <div class="field">
+              <label for="last-name">Soyad <span class="optional">(ixtiyari)</span></label>
+              <input id="last-name" name="last_name" autocomplete="family-name" maxlength="80" aria-describedby="last-name-error">
+              <p id="last-name-error" class="form-error" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="size-heading">
+            <span id="size-label">Ölçü</span>
+            <button type="button" class="size-guide-button" id="open-size-guide" aria-haspopup="dialog" aria-controls="size-guide" hidden>Ölçü cədvəli</button>
+          </div>
+          <fieldset id="sizes" aria-labelledby="size-label">
             <div class="sizes">
               <label><input type="radio" name="size" value="S" required><span>S</span></label>
               <label><input type="radio" name="size" value="M" required><span>M</span></label>
@@ -122,6 +137,11 @@
             <input id="whatsapp" type="tel" name="contact" maxlength="32" autocomplete="tel" placeholder="+994 50 123 45 67" aria-describedby="contact-error" required disabled>
           </div>
           <p id="contact-error" class="form-error" aria-live="polite"></p>
+          <div class="field">
+            <label for="instagram">Instagram istifadəçi adı <span class="optional">(ixtiyari)</span></label>
+            <input id="instagram" name="instagram" maxlength="31" placeholder="@istifadeci_adi" aria-describedby="instagram-error" autocapitalize="none" spellcheck="false">
+            <p id="instagram-error" class="form-error" aria-live="polite"></p>
+          </div>
           <div hidden><label for="website">Veb-sayt</label><input name="website" id="website" tabindex="-1" autocomplete="off"></div>
           <input type="hidden" name="consent" value="notice-v2">
           <input type="hidden" name="contact_channel" value="email">
@@ -129,6 +149,25 @@
           <p id="privacy">Qeydiyyat ödənişsizdir. Yalnız drop xəbəri üçün istifadə olunur.</p>
           <p id="form-status" class="form-status" role="status" aria-atomic="true"></p>
         </form>
+        <dialog id="size-guide" aria-labelledby="size-guide-title">
+          <div class="size-guide-heading">
+            <h3 id="size-guide-title">Ölçü cədvəli <span>(sm)</span></h3>
+            <form method="dialog">
+              <button type="submit" class="size-guide-button" autofocus>Bağla</button>
+            </form>
+          </div>
+          <table aria-labelledby="size-guide-title">
+            <thead>
+              <tr><th scope="col">Ölçü</th><th scope="col">Sinə</th><th scope="col">Bel</th><th scope="col">Uzunluq</th><th scope="col">Çiyin</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">S</th><td>92–96</td><td>76–80</td><td>68–70</td><td>44–46</td></tr>
+              <tr><th scope="row">M</th><td>98–102</td><td>82–86</td><td>71–73</td><td>47–49</td></tr>
+              <tr><th scope="row">L</th><td>104–108</td><td>88–92</td><td>74–76</td><td>50–52</td></tr>
+              <tr><th scope="row">XL</th><td>110–114</td><td>94–98</td><td>77–79</td><td>53–55</td></tr>
+            </tbody>
+          </table>
+        </dialog>
         <div class="success" hidden>
           <canvas id="burst" aria-hidden="true"></canvas>
           <div><h2 id="success-title" tabindex="-1">Sifarişiniz qəbul edildi! 🔥</h2><p id="success-message"></p></div>

@@ -389,6 +389,11 @@ const submitLabel = $(".submit-label");
 const sizeGroup = $("#sizes");
 const sizeError = $("#size-error");
 const contactError = $("#contact-error");
+const customerErrors = {
+  first_name: $("#first-name-error"),
+  last_name: $("#last-name-error"),
+  instagram: $("#instagram-error"),
+};
 const contactSwitch = $(".contact-switch");
 const channel = form.elements.contact_channel;
 const contactFields = [...form.querySelectorAll("[data-field]")];
@@ -398,6 +403,12 @@ const success = $(".success");
 const heading = $("#waitlist-title");
 const firstSize = form.querySelector('[name="size"]');
 let saved = false;
+const sizeGuide = $("#size-guide");
+const openSizeGuide = $("#open-size-guide");
+if (typeof sizeGuide.showModal === "function") {
+  openSizeGuide.hidden = false;
+  openSizeGuide.addEventListener("click", () => sizeGuide.showModal());
+}
 contactSwitch.hidden = false;
 function selectContact(button) {
   channel.value = button.dataset.contact;
@@ -444,6 +455,9 @@ form.addEventListener("input", ({ target }) => {
   } else if (target.name === "contact") {
     target.removeAttribute("aria-invalid");
     contactError.textContent = "";
+  } else if (Object.hasOwn(customerErrors, target.name)) {
+    target.removeAttribute("aria-invalid");
+    customerErrors[target.name].textContent = "";
   }
   status.textContent = "";
 });
@@ -457,6 +471,9 @@ form.addEventListener("submit", async (event) => {
   const contactMessage = email
     ? "Düzgün e-poçt ünvanı yaz. Məsələn, ad@example.com."
     : "WhatsApp nömrəsini +994 və 9 rəqəmlə yaz.";
+  if (!form.elements.first_name.value.trim()) {
+    return showError("Adını yaz.", form.elements.first_name, customerErrors.first_name);
+  }
   if (!form.elements.size.value) return showError("S, M, L və ya XL ölçülərindən birini seç.", firstSize, sizeError);
   if (!value || (email ? !contact.validity.valid || !/@[^@]+\.[^@]+$/.test(value) :
     !/^\+[0-9 ()-]+$/.test(value) || !/^\+994[0-9]{9}$/.test(value.replace(/[ ()-]/g, "")))) {
@@ -479,6 +496,9 @@ form.addEventListener("submit", async (event) => {
     const data = await response.json();
     if (!response.ok || data.ok !== true) {
       for (const control of fieldControls) control.disabled = false;
+      if (Object.hasOwn(customerErrors, data.field)) {
+        return showError(data.message, form.elements[data.field], customerErrors[data.field]);
+      }
       const target = data.field === "contact" ? contact : data.field === "size" ? firstSize : null;
       const output = target === contact ? contactError : target === firstSize ? sizeError : status;
       return showError(data.message || "Bir az sonra yenidən cəhd et.", target, output);

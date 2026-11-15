@@ -1,0 +1,6 @@
+{
+  "name": "land-of-fire-drop-001",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2025-04-01",
+  "build": { "command": "npm run build" }
+}

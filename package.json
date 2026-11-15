@@ -1,0 +1,10 @@
+{
+  "name": "land-of-fire-drop-001",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "npm run build && node --test scripts/waitlist.test.mjs"
+  }
+}
